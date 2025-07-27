@@ -438,7 +438,7 @@ mod tests {
         let result = FakeOperator::generate(&args).unwrap();
         assert!(result.is_number());
         let value = result.as_u64().unwrap();
-        assert!(value >= 10 && value <= 20);
+        assert!((10..=20).contains(&value));
     }
 
     #[test]
