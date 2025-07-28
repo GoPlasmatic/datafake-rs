@@ -24,7 +24,7 @@ fake = { version = "2.9", features = ["derive", "chrono", "uuid"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0"
-rand = "0.8"
+rand = "0.9"
 chrono = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
