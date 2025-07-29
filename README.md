@@ -1,5 +1,5 @@
 <div align="center">
-<img src="[https://avatars.githubusercontent.com/u/207296579?s=200\&v=4](https://avatars.githubusercontent.com/u/207296579?s=200&v=4)" alt="Plasmatic Logo" width="120" height="120">
+<img src="https://avatars.githubusercontent.com/u/207296579?s=200&v=4" alt="Plasmatic Logo" width="120" height="120">
 
 # datafake-rs
 
@@ -14,9 +14,9 @@
 [](https://codecov.io/gh/GoPlasmatic/datafake-rs)
 
 <p>
-<a href="[https://github.com/GoPlasmatic](https://github.com/GoPlasmatic)">🏢 Organization</a> •
-<a href="[https://docs.rs/datafake-rs](https://docs.rs/datafake-rs)">📖 Docs</a> •
-<a href="[https://github.com/GoPlasmatic/datafake-rs/issues](https://github.com/GoPlasmatic/datafake-rs/issues)">🐛 Report a Bug</a>  
+<a href="https://github.com/GoPlasmatic">🏢 Organization</a> •
+<a href="https://docs.rs/datafake-rs">📖 Docs</a> •
+<a href="https://github.com/GoPlasmatic/datafake-rs/issues">🐛 Report a Bug</a>  
 </p>
 </div>
 
@@ -336,5 +336,5 @@ This project is licensed under the Apache License, Version 2.0. See the [LICENSE
 -----
 
 <div align="center">
-<p>Built with ❤️ by the <a href="[https://github.com/GoPlasmatic](https://github.com/GoPlasmatic)">Plasmatic</a> team</p>
+<p>Built with ❤️ by the <a href="https://github.com/GoPlasmatic">Plasmatic</a> team</p>
 </div>
