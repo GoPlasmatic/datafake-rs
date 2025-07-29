@@ -52,7 +52,7 @@ impl FakeOperator {
             "f64" => Self::generate_f64(args),
 
             // Boolean
-            "bool" | "boolean" => Ok(Value::Bool(rand::thread_rng().gen())),
+            "bool" | "boolean" => Ok(Value::Bool(rand::rng().random())),
 
             // UUID
             "uuid" => Ok(Value::String(fake::uuid::UUIDv4.fake())),
@@ -175,7 +175,7 @@ impl FakeOperator {
                 let min = args[1].as_u64().unwrap_or(0) as u8;
                 let max = args[2].as_u64().unwrap_or(255) as u8;
                 Ok(Value::Number(serde_json::Number::from(
-                    rand::thread_rng().gen_range(min..=max),
+                    rand::rng().random_range(min..=max),
                 )))
             }
             _ => Err(DataFakeError::FakeOperatorError(
@@ -191,7 +191,7 @@ impl FakeOperator {
                 let min = args[1].as_u64().unwrap_or(0) as u16;
                 let max = args[2].as_u64().unwrap_or(65535) as u16;
                 Ok(Value::Number(serde_json::Number::from(
-                    rand::thread_rng().gen_range(min..=max),
+                    rand::rng().random_range(min..=max),
                 )))
             }
             _ => Err(DataFakeError::FakeOperatorError(
@@ -207,7 +207,7 @@ impl FakeOperator {
                 let min = args[1].as_u64().unwrap_or(0) as u32;
                 let max = args[2].as_u64().unwrap_or(u32::MAX as u64) as u32;
                 Ok(Value::Number(serde_json::Number::from(
-                    rand::thread_rng().gen_range(min..=max),
+                    rand::rng().random_range(min..=max),
                 )))
             }
             _ => Err(DataFakeError::FakeOperatorError(
@@ -223,7 +223,7 @@ impl FakeOperator {
                 let min = args[1].as_u64().unwrap_or(0);
                 let max = args[2].as_u64().unwrap_or(u64::MAX);
                 Ok(Value::Number(serde_json::Number::from(
-                    rand::thread_rng().gen_range(min..=max),
+                    rand::rng().random_range(min..=max),
                 )))
             }
             _ => Err(DataFakeError::FakeOperatorError(
@@ -239,7 +239,7 @@ impl FakeOperator {
                 let min = args[1].as_i64().unwrap_or(i8::MIN as i64) as i8;
                 let max = args[2].as_i64().unwrap_or(i8::MAX as i64) as i8;
                 Ok(Value::Number(serde_json::Number::from(
-                    rand::thread_rng().gen_range(min..=max),
+                    rand::rng().random_range(min..=max),
                 )))
             }
             _ => Err(DataFakeError::FakeOperatorError(
@@ -255,7 +255,7 @@ impl FakeOperator {
                 let min = args[1].as_i64().unwrap_or(i16::MIN as i64) as i16;
                 let max = args[2].as_i64().unwrap_or(i16::MAX as i64) as i16;
                 Ok(Value::Number(serde_json::Number::from(
-                    rand::thread_rng().gen_range(min..=max),
+                    rand::rng().random_range(min..=max),
                 )))
             }
             _ => Err(DataFakeError::FakeOperatorError(
@@ -271,7 +271,7 @@ impl FakeOperator {
                 let min = args[1].as_i64().unwrap_or(i32::MIN as i64) as i32;
                 let max = args[2].as_i64().unwrap_or(i32::MAX as i64) as i32;
                 Ok(Value::Number(serde_json::Number::from(
-                    rand::thread_rng().gen_range(min..=max),
+                    rand::rng().random_range(min..=max),
                 )))
             }
             _ => Err(DataFakeError::FakeOperatorError(
@@ -287,7 +287,7 @@ impl FakeOperator {
                 let min = args[1].as_i64().unwrap_or(i64::MIN);
                 let max = args[2].as_i64().unwrap_or(i64::MAX);
                 Ok(Value::Number(serde_json::Number::from(
-                    rand::thread_rng().gen_range(min..=max),
+                    rand::rng().random_range(min..=max),
                 )))
             }
             _ => Err(DataFakeError::FakeOperatorError(
@@ -304,7 +304,7 @@ impl FakeOperator {
             3 => {
                 let min = args[1].as_f64().unwrap_or(0.0) as f32;
                 let max = args[2].as_f64().unwrap_or(1.0) as f32;
-                let value = rand::thread_rng().gen_range(min..=max);
+                let value = rand::rng().random_range(min..=max);
                 Ok(Value::Number(
                     serde_json::Number::from_f64(value as f64).unwrap(),
                 ))
@@ -323,7 +323,7 @@ impl FakeOperator {
             3 => {
                 let min = args[1].as_f64().unwrap_or(0.0);
                 let max = args[2].as_f64().unwrap_or(1.0);
-                let value = rand::thread_rng().gen_range(min..=max);
+                let value = rand::rng().random_range(min..=max);
                 Ok(Value::Number(serde_json::Number::from_f64(value).unwrap()))
             }
             _ => Err(DataFakeError::FakeOperatorError(
