@@ -1,4 +1,5 @@
 use crate::error::{DataFakeError, Result};
+use chrono::Utc;
 use datalogic_rs::DataValue;
 use fake::faker::address::en::{
     CityName, CountryCode, CountryName, Latitude, Longitude, PostCode, StateAbbr, StateName,
@@ -71,7 +72,7 @@ impl FakeOperator {
             "state_name" => Ok(Value::String(StateName().fake())),
             "state_abbr" => Ok(Value::String(StateAbbr().fake())),
             "zip_code" | "zip" => Ok(Value::String(ZipCode().fake())),
-            "post_code" => Ok(Value::String(PostCode().fake())),
+            "post_code" | "postcode" | "postal_code" => Ok(Value::String(PostCode().fake())),
             "latitude" => Ok(Value::Number(
                 serde_json::Number::from_f64(Latitude().fake::<f64>()).unwrap(),
             )),
@@ -82,7 +83,7 @@ impl FakeOperator {
             "street_suffix" => Ok(Value::String(StreetSuffix().fake())),
 
             // Name related
-            "name" => {
+            "name" | "full_name" => {
                 // For now, use English locale only
                 use fake::faker::name::en::Name;
                 Ok(Value::String(Name().fake()))
@@ -114,6 +115,16 @@ impl FakeOperator {
                 Ok(Value::String(Password(min_len..max_len).fake()))
             }
             "domain_suffix" => Ok(Value::String(DomainSuffix().fake())),
+            "domain_name" => {
+                // Generate a domain name
+                let words: Vec<String> = Words(1..2).fake();
+                let suffix = DomainSuffix().fake::<String>();
+                Ok(Value::String(format!(
+                    "{}.{}",
+                    words.join("").to_lowercase(),
+                    suffix
+                )))
+            }
             "ipv4" => Ok(Value::String(IPv4().fake())),
             "ipv6" => Ok(Value::String(IPv6().fake())),
             "mac_address" => Ok(Value::String(MACAddress().fake())),
@@ -161,6 +172,120 @@ impl FakeOperator {
             "file_extension" => Ok(Value::String(FileExtension().fake())),
             "dir_path" => Ok(Value::String(DirPath().fake())),
             "file_path" => Ok(Value::String(FilePath().fake())),
+
+            // Date/Time - Generate ISO8601 formatted datetime
+            "datetime" | "iso8601_datetime" => {
+                let now = Utc::now();
+                Ok(Value::String(now.to_rfc3339()))
+            }
+            "date" => {
+                // Generate date in specified format
+                let format = args.get(1).and_then(|v| v.as_str()).unwrap_or("%Y-%m-%d");
+                let now = Utc::now();
+                Ok(Value::String(now.format(format).to_string()))
+            }
+            "time" => {
+                // Generate time in HH:MM:SS format
+                let mut rng = rand::rng();
+                let hour = rng.random_range(0..24);
+                let minute = rng.random_range(0..60);
+                let second = rng.random_range(0..60);
+                Ok(Value::String(format!("{hour:02}:{minute:02}:{second:02}")))
+            }
+            "month_name" => {
+                // Generate a month name
+                let months = [
+                    "January",
+                    "February",
+                    "March",
+                    "April",
+                    "May",
+                    "June",
+                    "July",
+                    "August",
+                    "September",
+                    "October",
+                    "November",
+                    "December",
+                ];
+                let mut rng = rand::rng();
+                let idx = rng.random_range(0..months.len());
+                Ok(Value::String(months[idx].to_string()))
+            }
+
+            // Financial - Custom types for MX messages
+            "iban" => {
+                let country = args.get(1).and_then(|v| v.as_str()).unwrap_or("DE");
+                let mut rng = rand::rng();
+                let check = format!("{:02}", rng.random_range(10..99));
+                let account: String = (0..18)
+                    .map(|_| rng.random_range(0..10).to_string())
+                    .collect();
+                Ok(Value::String(format!("{country}{check}{account}")))
+            }
+            "lei" => {
+                // Generate a realistic LEI (18 uppercase alphanumeric + 2 check digits)
+                let chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                let mut rng = rand::rng();
+                let lei: String = (0..18)
+                    .map(|_| chars.chars().nth(rng.random_range(0..chars.len())).unwrap())
+                    .collect();
+                let check = format!("{:02}", rng.random_range(10..99));
+                Ok(Value::String(format!("{lei}{check}")))
+            }
+            "alphanumeric" => {
+                let min_len = args.get(1).and_then(|v| v.as_u64()).unwrap_or(10) as usize;
+                let max_len = args
+                    .get(2)
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(min_len as u64) as usize;
+                let mut rng = rand::rng();
+                let len = if min_len == max_len {
+                    min_len
+                } else {
+                    rng.random_range(min_len..=max_len)
+                };
+                let chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                let result: String = (0..len)
+                    .map(|_| chars.chars().nth(rng.random_range(0..chars.len())).unwrap())
+                    .collect();
+                Ok(Value::String(result))
+            }
+
+            // Enum/Choice - pick one value from provided options
+            "enum" | "pick" | "choice" => {
+                if args.len() < 2 {
+                    return Err(DataFakeError::FakeOperatorError(
+                        "enum requires at least one option".to_string(),
+                    ));
+                }
+                let options = &args[1..];
+                let mut rng = rand::rng();
+                let idx = rng.random_range(0..options.len());
+                Ok(options[idx].clone())
+            }
+
+            // Regex - Handle simple regex patterns for selecting from options
+            "regex" => {
+                if let Some(Value::String(pattern)) = args.get(1) {
+                    // Simple handling for common patterns like "(A|B|C)"
+                    if pattern.starts_with('(') && pattern.ends_with(')') {
+                        let inner = &pattern[1..pattern.len() - 1];
+                        let options: Vec<&str> = inner.split('|').collect();
+                        if !options.is_empty() {
+                            let mut rng = rand::rng();
+                            let idx = rng.random_range(0..options.len());
+                            return Ok(Value::String(options[idx].to_string()));
+                        }
+                    }
+                    // For other patterns, just return a placeholder
+                    Ok(Value::String("REGEX_PATTERN".to_string()))
+                } else {
+                    Err(DataFakeError::FakeOperatorError(
+                        "regex requires a pattern argument".to_string(),
+                    ))
+                }
+            }
 
             _ => Err(DataFakeError::FakeOperatorError(format!(
                 "Unknown fake method: {method}"
