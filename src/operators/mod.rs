@@ -1,3 +1,3 @@
 pub mod fake;
 
-pub use fake::{fake_operator_handler, FakeOperator};
+pub use fake::{FakeOperator, fake_operator_handler};

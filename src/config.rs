@@ -91,14 +91,13 @@ impl ConfigParser {
         if let Value::Object(map) = value {
             if map.contains_key("fake") {
                 Self::validate_fake_operator(map.get("fake").unwrap())?;
-            } else if map.contains_key("var") {
-                if let Some(Value::String(var_name)) = map.get("var") {
-                    if var_name.is_empty() {
-                        return Err(DataFakeError::InvalidConfig(
-                            "Variable reference cannot be empty".to_string(),
-                        ));
-                    }
-                }
+            } else if map.contains_key("var")
+                && let Some(Value::String(var_name)) = map.get("var")
+                && var_name.is_empty()
+            {
+                return Err(DataFakeError::InvalidConfig(
+                    "Variable reference cannot be empty".to_string(),
+                ));
             }
         }
         Ok(())

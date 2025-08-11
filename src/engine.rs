@@ -221,10 +221,12 @@ mod tests {
         assert!(result["user"]["profile"]["age"].is_number());
         let age = result["user"]["profile"]["age"].as_u64().unwrap();
         assert!((18..=65).contains(&age));
-        assert!(result["user"]["profile"]["nested"]["email"]
-            .as_str()
-            .unwrap()
-            .contains('@'));
+        assert!(
+            result["user"]["profile"]["nested"]["email"]
+                .as_str()
+                .unwrap()
+                .contains('@')
+        );
         assert_eq!(result["user"]["profile"]["nested"]["active"], true);
         assert_eq!(result["user"]["profile"]["nested"]["count"], 42);
         assert_eq!(result["metadata"]["version"], "1.0");
