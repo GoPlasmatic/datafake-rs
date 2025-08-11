@@ -1,6 +1,6 @@
 [package]
 name = "datafake-rs"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 authors = ["Plasmatic Engineering <shankar@goplasmatic.io>"]
 description = "High-performance JSON mock data generation using JSONLogic configuration"
