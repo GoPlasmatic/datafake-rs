@@ -1,6 +1,6 @@
 [package]
 name = "datafake-rs"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 authors = ["Plasmatic Engineering <shankar@goplasmatic.io>"]
 description = "High-performance JSON mock data generation using JSONLogic configuration"
@@ -18,7 +18,7 @@ categories = [
 exclude = [".github/*", ".gitignore", "CONTRIBUTING.md"]
 
 [dependencies]
-datalogic-rs = "3.0"
+datalogic-rs = { path = "../datalogic-rs" }
 fake = { version = "4.4", features = ["derive", "chrono", "uuid"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

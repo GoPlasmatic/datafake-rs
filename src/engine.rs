@@ -6,10 +6,10 @@ use serde_json::{Map, Value};
 use std::cell::RefCell;
 
 thread_local! {
-    static THREAD_LOCAL_DATA_LOGIC: RefCell<Option<DataLogic>> = const { RefCell::new(None) };
+    static THREAD_LOCAL_DATA_LOGIC: RefCell<Option<DataLogic<'static>>> = const { RefCell::new(None) };
 }
 
-fn get_or_init_datalogic() -> &'static RefCell<Option<DataLogic>> {
+fn get_or_init_datalogic() -> &'static RefCell<Option<DataLogic<'static>>> {
     THREAD_LOCAL_DATA_LOGIC.with(|dl_cell| {
         let mut dl_opt = dl_cell.borrow_mut();
         if dl_opt.is_none() {
@@ -20,7 +20,7 @@ fn get_or_init_datalogic() -> &'static RefCell<Option<DataLogic>> {
             *dl_opt = Some(dl);
         }
         // This is safe because we're returning a reference to a thread_local
-        unsafe { &*(dl_cell as *const RefCell<Option<DataLogic>>) }
+        unsafe { &*(dl_cell as *const RefCell<Option<DataLogic<'static>>>) }
     })
 }
 
@@ -33,7 +33,7 @@ impl Engine {
         let mut dl_opt = dl_cell.borrow_mut();
         let data_logic = dl_opt.as_mut().unwrap();
 
-        data_logic.reset_arena();
+        data_logic.reset_eval_arena();
 
         // Convert context to JSON value for datalogic
         let context_json =
@@ -41,7 +41,7 @@ impl Engine {
 
         // Evaluate the expression
         data_logic
-            .evaluate_json(expression, &context_json, None)
+            .evaluate_json(expression, &context_json)
             .map_err(|e| {
                 DataFakeError::FakeOperatorError(format!("JSONLogic evaluation error: {e}"))
             })
