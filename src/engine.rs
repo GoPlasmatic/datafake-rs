@@ -1,26 +1,29 @@
 use crate::error::{DataFakeError, Result};
-use crate::operators::fake_operator_handler;
+use crate::operators::FakeOperator;
 use crate::types::GenerationContext;
 use datalogic_rs::DataLogic;
 use serde_json::{Map, Value};
 use std::cell::RefCell;
 
 thread_local! {
-    static THREAD_LOCAL_DATA_LOGIC: RefCell<Option<DataLogic<'static>>> = const { RefCell::new(None) };
+    static THREAD_LOCAL_DATA_LOGIC: RefCell<Option<DataLogic>> = const { RefCell::new(None) };
 }
 
-fn get_or_init_datalogic() -> &'static RefCell<Option<DataLogic<'static>>> {
+fn get_or_init_datalogic() -> &'static RefCell<Option<DataLogic>> {
     THREAD_LOCAL_DATA_LOGIC.with(|dl_cell| {
         let mut dl_opt = dl_cell.borrow_mut();
         if dl_opt.is_none() {
-            let mut dl = DataLogic::with_preserve_structure();
+            // Note: Cannot use preserve_structure mode with custom operators in v4
+            // This is a limitation in datalogic-rs v4 where custom operators are not
+            // recognized in preserve_structure mode
+            let mut dl = DataLogic::new();
             // Register the fake operator
-            dl.register_simple_operator("fake", fake_operator_handler);
+            dl.add_operator("fake".to_string(), Box::new(FakeOperator));
 
             *dl_opt = Some(dl);
         }
         // This is safe because we're returning a reference to a thread_local
-        unsafe { &*(dl_cell as *const RefCell<Option<DataLogic<'static>>>) }
+        unsafe { &*(dl_cell as *const RefCell<Option<DataLogic>>) }
     })
 }
 
@@ -30,26 +33,78 @@ impl Engine {
     pub fn evaluate(expression: &Value, context: &GenerationContext) -> Result<Value> {
         // Evaluate the expression directly with JSONLogic (fake operator is registered)
         let dl_cell = get_or_init_datalogic();
-        let mut dl_opt = dl_cell.borrow_mut();
-        let data_logic = dl_opt.as_mut().unwrap();
-
-        data_logic.reset_eval_arena();
+        let dl_opt = dl_cell.borrow();
+        let data_logic = dl_opt.as_ref().unwrap();
 
         // Convert context to JSON value for datalogic
         let context_json =
             serde_json::to_value(&context.variables).map_err(DataFakeError::JsonError)?;
 
-        // Evaluate the expression
+        // Compile and evaluate the expression
+        let compiled = data_logic.compile(expression).map_err(|e| {
+            DataFakeError::FakeOperatorError(format!("JSONLogic compilation error: {e}"))
+        })?;
+
         data_logic
-            .evaluate_json(expression, &context_json)
+            .evaluate_owned(&compiled, context_json)
             .map_err(|e| {
                 DataFakeError::FakeOperatorError(format!("JSONLogic evaluation error: {e}"))
             })
     }
 
     pub fn process_schema(schema: &Value, context: &GenerationContext) -> Result<Value> {
-        // With preserve_structure enabled, the entire schema is treated as a single JSONLogic expression
-        Self::evaluate(schema, context)
+        // Since we can't use preserve_structure with custom operators in v4,
+        // we need to manually handle object structure preservation
+        match schema {
+            Value::Object(obj) if obj.len() == 1 => {
+                // Single-key objects might be JSONLogic operators
+                if let Some((key, _value)) = obj.iter().next() {
+                    // Check if this looks like a JSONLogic operator
+                    // Known operators or custom operators should be evaluated
+                    if Self::is_jsonlogic_operator(key) {
+                        return Self::evaluate(schema, context);
+                    }
+                }
+                // Not an operator, process as regular object
+                let mut result = serde_json::Map::new();
+                for (key, value) in obj {
+                    result.insert(key.clone(), Self::process_schema(value, context)?);
+                }
+                Ok(Value::Object(result))
+            }
+            Value::Object(obj) => {
+                // Multi-key objects are treated as templates
+                let mut result = serde_json::Map::new();
+                for (key, value) in obj {
+                    result.insert(key.clone(), Self::process_schema(value, context)?);
+                }
+                Ok(Value::Object(result))
+            }
+            Value::Array(arr) => {
+                let mut result = Vec::new();
+                for item in arr {
+                    result.push(Self::process_schema(item, context)?);
+                }
+                Ok(Value::Array(result))
+            }
+            _ => {
+                // Primitive values are returned as-is
+                Ok(schema.clone())
+            }
+        }
+    }
+
+    fn is_jsonlogic_operator(key: &str) -> bool {
+        // Check if this is a known JSONLogic operator or our custom operator
+        matches!(
+            key,
+            "var" | "==" | "!=" | "===" | "!==" | "!" | "!!" | "or" | "and" | "?:" | "if" |
+            ">" | ">=" | "<" | "<=" | "max" | "min" | "+" | "-" | "*" | "/" | "%" |
+            "map" | "filter" | "reduce" | "all" | "none" | "some" | "merge" | "in" |
+            "cat" | "substr" | "log" | "method" | "preserve" | "missing" | "missing_some" |
+            // Our custom operator
+            "fake"
+        )
     }
 
     pub fn generate_variables(variables: &Map<String, Value>) -> Result<Map<String, Value>> {
@@ -57,12 +112,12 @@ impl Engine {
             return Ok(Map::new());
         }
 
-        // With preserve_structure enabled, we can evaluate all variables as a single expression
-        // This is more efficient than evaluating each variable separately
-        let variables_as_value = Value::Object(variables.clone());
+        // Since we can't use preserve_structure with custom operators,
+        // we process each variable individually
         let temp_context = GenerationContext::new();
+        let variables_as_value = Value::Object(variables.clone());
 
-        match Self::evaluate(&variables_as_value, &temp_context)? {
+        match Self::process_schema(&variables_as_value, &temp_context)? {
             Value::Object(map) => Ok(map),
             _ => Err(DataFakeError::FakeOperatorError(
                 "Variables evaluation did not return an object".to_string(),

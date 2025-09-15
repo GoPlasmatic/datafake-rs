@@ -1,6 +1,6 @@
 use crate::error::{DataFakeError, Result};
 use chrono::Utc;
-use datalogic_rs::DataValue;
+use datalogic_rs::{ContextStack, Evaluator, Operator};
 use fake::faker::address::en::{
     CityName, CountryCode, CountryName, Latitude, Longitude, PostCode, StateAbbr, StateName,
     StreetName, StreetSuffix, ZipCode,
@@ -24,6 +24,18 @@ use rand::Rng;
 use serde_json::Value;
 
 pub struct FakeOperator;
+
+impl Operator for FakeOperator {
+    fn evaluate(
+        &self,
+        args: &[Value],
+        _context: &mut ContextStack,
+        _evaluator: &dyn Evaluator,
+    ) -> std::result::Result<Value, datalogic_rs::Error> {
+        // Call the existing generate method and convert error
+        FakeOperator::generate(args).map_err(|e| datalogic_rs::Error::Custom(e.to_string()))
+    }
+}
 
 impl FakeOperator {
     pub fn generate(args: &[Value]) -> Result<Value> {
@@ -455,85 +467,6 @@ impl FakeOperator {
                 "f64 requires either 1 or 3 arguments".to_string(),
             )),
         }
-    }
-}
-
-/// Handler function for the fake operator that integrates with datalogic-rs
-pub fn fake_operator_handler<'r>(
-    args: Vec<DataValue<'r>>,
-    _data: DataValue<'r>,
-) -> std::result::Result<DataValue<'r>, String> {
-    // Convert DataValue args to serde_json::Value for compatibility with existing FakeOperator
-    let mut json_args = Vec::new();
-
-    for arg in args {
-        let json_value = if let Some(s) = arg.as_str() {
-            Value::String(s.to_string())
-        } else if let Some(n) = arg.as_i64() {
-            Value::Number(serde_json::Number::from(n))
-        } else if let Some(n) = arg.as_f64() {
-            Value::Number(serde_json::Number::from_f64(n).unwrap_or(serde_json::Number::from(0)))
-        } else if let Some(b) = arg.as_bool() {
-            Value::Bool(b)
-        } else if let Some(arr) = arg.as_array() {
-            // Handle array arguments - recursively convert each element
-            let mut arr_values = Vec::new();
-            for item in arr {
-                if let Some(s) = item.as_str() {
-                    arr_values.push(Value::String(s.to_string()));
-                } else if let Some(n) = item.as_i64() {
-                    arr_values.push(Value::Number(serde_json::Number::from(n)));
-                } else if let Some(n) = item.as_f64() {
-                    arr_values.push(Value::Number(
-                        serde_json::Number::from_f64(n).unwrap_or(serde_json::Number::from(0)),
-                    ));
-                } else if let Some(b) = item.as_bool() {
-                    arr_values.push(Value::Bool(b));
-                } else {
-                    return Err("Unsupported array element type in fake operator".to_string());
-                }
-            }
-            // If we have an array as the first argument, use its elements as the args
-            if json_args.is_empty() {
-                json_args = arr_values;
-                continue;
-            }
-            Value::Array(arr_values)
-        } else {
-            return Err(format!(
-                "Unsupported argument type for fake operator: {arg:?}"
-            ));
-        };
-        json_args.push(json_value);
-    }
-
-    // Call the existing FakeOperator
-    match FakeOperator::generate(&json_args) {
-        Ok(value) => {
-            // Convert the result back to DataValue
-            match value {
-                Value::String(s) => {
-                    let leaked_str = Box::leak(s.into_boxed_str());
-                    Ok(DataValue::String(leaked_str))
-                }
-                Value::Number(n) => {
-                    if let Some(i) = n.as_i64() {
-                        Ok(DataValue::Number(
-                            datalogic_rs::value::NumberValue::from_i64(i),
-                        ))
-                    } else if let Some(f) = n.as_f64() {
-                        Ok(DataValue::Number(
-                            datalogic_rs::value::NumberValue::from_f64(f),
-                        ))
-                    } else {
-                        Err("Invalid number format".to_string())
-                    }
-                }
-                Value::Bool(b) => Ok(DataValue::Bool(b)),
-                _ => Err("Unsupported return type from fake operator".to_string()),
-            }
-        }
-        Err(e) => Err(e.to_string()),
     }
 }
 

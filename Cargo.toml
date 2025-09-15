@@ -18,7 +18,7 @@ categories = [
 exclude = [".github/*", ".gitignore", "CONTRIBUTING.md"]
 
 [dependencies]
-datalogic-rs = "3.1"
+datalogic-rs = "4.0"
 fake = { version = "4.4", features = ["derive", "chrono", "uuid"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
