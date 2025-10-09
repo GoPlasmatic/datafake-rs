@@ -131,7 +131,11 @@ The `fake` operator can generate over 50 different types of data.
 #### Financial
 
 ```json
-{"fake": ["bic"]}
+{"fake": ["bic"]}              // Random 8 or 11 character BIC
+{"fake": ["bic", 8]}            // Fixed 8 character BIC
+{"fake": ["bic", 11]}           // Fixed 11 character BIC
+{"fake": ["bic8"]}              // Fixed 8 character BIC (shorthand)
+{"fake": ["bic11"]}             // Fixed 11 character BIC (shorthand)
 {"fake": ["credit_card_number"]}
 {"fake": ["currency_code"]}
 {"fake": ["currency_symbol"]}

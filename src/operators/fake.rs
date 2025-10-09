@@ -147,7 +147,20 @@ impl FakeOperator {
             "cell_number" => Ok(Value::String(CellNumber().fake())),
 
             // Finance
-            "bic" => Ok(Value::String(Bic().fake())),
+            "bic" => {
+                // Support optional length parameter (8 or 11)
+                let length = args.get(1).and_then(|v| v.as_u64());
+                match length {
+                    Some(8) => Self::generate_bic_fixed(8),
+                    Some(11) => Self::generate_bic_fixed(11),
+                    Some(_) => Err(DataFakeError::FakeOperatorError(
+                        "BIC length must be 8 or 11".to_string(),
+                    )),
+                    None => Ok(Value::String(Bic().fake())), // Default: random 8 or 11
+                }
+            }
+            "bic8" => Self::generate_bic_fixed(8),
+            "bic11" => Self::generate_bic_fixed(11),
             "credit_card_number" => Ok(Value::String(CreditCardNumber().fake())),
 
             // Currency
@@ -468,6 +481,77 @@ impl FakeOperator {
             )),
         }
     }
+
+    fn generate_bic_fixed(length: u64) -> Result<Value> {
+        use rand::seq::IndexedRandom;
+        let mut rng = rand::rng();
+
+        // Constants for BIC generation
+        const ALPHABET: &[char; 26] = &[
+            'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
+            'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+        ];
+        const VOWELS: &[char; 5] = &['A', 'E', 'I', 'O', 'U'];
+        const ISO3166: &[&str] = &[
+            "AC", "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AN", "AO", "AQ", "AR", "AS", "AT",
+            "AU", "AW", "AX", "AZ", "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BL",
+            "BM", "BN", "BO", "BQ", "BR", "BS", "BT", "BU", "BV", "BW", "BY", "BZ", "CA", "CC",
+            "CD", "CE", "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN", "CO", "CP", "CR", "CS",
+            "CU", "CV", "CW", "CX", "CY", "CZ", "DD", "DE", "DG", "DJ", "DK", "DM", "DO", "DZ",
+            "EA", "EC", "EE", "EG", "EH", "ER", "ES", "ET", "EU", "FI", "FJ", "FK", "FM", "FO",
+            "FR", "FX", "GA", "GB", "GD", "GE", "GF", "GG", "GH", "GI", "GL", "GM", "GN", "GP",
+            "GQ", "GR", "GS", "GT", "GU", "GW", "GY", "HK", "HM", "HN", "HR", "HT", "HU", "IC",
+            "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT", "JE", "JM", "JO", "JP",
+            "KE", "KG", "KH", "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC",
+            "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MF", "MG",
+            "MH", "MK", "ML", "MM", "MN", "MO", "MP", "MQ", "MR", "MS", "MT", "MU", "MV", "MW",
+            "MX", "MY", "MZ", "NA", "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP", "NR", "NT",
+            "NU", "NZ", "OM", "PA", "PE", "PF", "PG", "PH", "PK", "PL", "PM", "PN", "PR", "PS",
+            "PT", "PW", "PY", "QA", "RE", "RO", "RS", "RU", "RW", "SA", "SB", "SC", "SD", "SE",
+            "SG", "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS", "ST", "SU", "SV",
+            "SX", "SY", "SZ", "TA", "TC", "TD", "TF", "TG", "TH", "TJ", "TK", "TL", "TM", "TN",
+            "TO", "TR", "TT", "TV", "TW", "TZ", "UA", "UG", "UM", "US", "UY", "UZ", "VA", "VC",
+            "VE", "VG", "VI", "VN", "VU", "WF", "WS", "YE", "YT", "YU", "ZA", "ZM", "ZR", "ZW",
+        ];
+
+        // Generate base 8-character BIC: AAAAVCC1
+        let base_bic = format!(
+            "{}{}{}{}{}{}1",
+            *ALPHABET.choose(&mut rng).unwrap(),
+            *ALPHABET.choose(&mut rng).unwrap(),
+            *ALPHABET.choose(&mut rng).unwrap(),
+            *VOWELS.choose(&mut rng).unwrap(),
+            *ISO3166.choose(&mut rng).unwrap(),
+            *ALPHABET.choose(&mut rng).unwrap(),
+        );
+
+        let bic = if length == 11 {
+            // Add branch code suffix (3 chars)
+            let prob: i8 = rng.random_range(0..100);
+            let suffix = if prob < 70 {
+                // 70% chance: numeric branch code
+                format!(
+                    "{}{}{}",
+                    rng.random_range('0'..='9'),
+                    rng.random_range('0'..='9'),
+                    rng.random_range('0'..='9'),
+                )
+            } else {
+                // 30% chance: alphabetic branch code
+                format!(
+                    "{}{}{}",
+                    *ALPHABET.choose(&mut rng).unwrap(),
+                    *VOWELS.choose(&mut rng).unwrap(),
+                    *ALPHABET.choose(&mut rng).unwrap(),
+                )
+            };
+            format!("{}{}", base_bic, suffix)
+        } else {
+            base_bic
+        };
+
+        Ok(Value::String(bic))
+    }
 }
 
 #[cfg(test)]
@@ -537,5 +621,63 @@ mod tests {
         let args = vec![];
         let result = FakeOperator::generate(&args);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_generate_bic_default() {
+        let args = vec![json!("bic")];
+        let result = FakeOperator::generate(&args).unwrap();
+        assert!(result.is_string());
+        let bic = result.as_str().unwrap();
+        assert!(bic.len() == 8 || bic.len() == 11);
+    }
+
+    #[test]
+    fn test_generate_bic8() {
+        let args = vec![json!("bic8")];
+        let result = FakeOperator::generate(&args).unwrap();
+        assert!(result.is_string());
+        let bic = result.as_str().unwrap();
+        assert_eq!(bic.len(), 8);
+    }
+
+    #[test]
+    fn test_generate_bic11() {
+        let args = vec![json!("bic11")];
+        let result = FakeOperator::generate(&args).unwrap();
+        assert!(result.is_string());
+        let bic = result.as_str().unwrap();
+        assert_eq!(bic.len(), 11);
+    }
+
+    #[test]
+    fn test_generate_bic_with_length_8() {
+        let args = vec![json!("bic"), json!(8)];
+        let result = FakeOperator::generate(&args).unwrap();
+        assert!(result.is_string());
+        let bic = result.as_str().unwrap();
+        assert_eq!(bic.len(), 8);
+    }
+
+    #[test]
+    fn test_generate_bic_with_length_11() {
+        let args = vec![json!("bic"), json!(11)];
+        let result = FakeOperator::generate(&args).unwrap();
+        assert!(result.is_string());
+        let bic = result.as_str().unwrap();
+        assert_eq!(bic.len(), 11);
+    }
+
+    #[test]
+    fn test_generate_bic_with_invalid_length() {
+        let args = vec![json!("bic"), json!(10)];
+        let result = FakeOperator::generate(&args);
+        assert!(result.is_err());
+        match result {
+            Err(DataFakeError::FakeOperatorError(msg)) => {
+                assert!(msg.contains("BIC length must be 8 or 11"));
+            }
+            _ => panic!("Expected FakeOperatorError with specific message"),
+        }
     }
 }

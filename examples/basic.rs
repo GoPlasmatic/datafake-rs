@@ -23,6 +23,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
                 "bankAccount": {
                     "bic": {"fake": ["bic"]},
+                    "bic8": {"fake": ["bic8"]},
+                    "bic11": {"fake": ["bic11"]},
                     "balance": {"fake": ["f32", 0, 10000.00]}
                 }
             }
