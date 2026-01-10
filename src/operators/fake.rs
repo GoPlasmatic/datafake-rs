@@ -49,6 +49,10 @@ impl FakeOperator {
             DataFakeError::FakeOperatorError("First argument must be a string".to_string())
         })?;
 
+        // NOTE: Locale parameter is parsed but not currently used for most operations.
+        // The underlying `fake-rs` crate has limited locale support - most generators
+        // only support English (en). The locale parameter is accepted for API compatibility
+        // and potential future expansion when fake-rs adds broader locale support.
         let _locale = args.get(1).and_then(|v| v.as_str()).unwrap_or("en");
 
         match method {
@@ -291,6 +295,14 @@ impl FakeOperator {
             }
 
             // Regex - Handle simple regex patterns for selecting from options
+            //
+            // LIMITATION: This implementation only supports simple alternation patterns
+            // in the form "(A|B|C)" where options are separated by pipe characters.
+            // Complex regex patterns (character classes, quantifiers, anchors, etc.)
+            // are NOT supported and will return the placeholder "REGEX_PATTERN".
+            //
+            // For full regex-based generation, consider using the "enum" or "pick"
+            // methods instead, which allow explicit listing of options.
             "regex" => {
                 if let Some(Value::String(pattern)) = args.get(1) {
                     // Simple handling for common patterns like "(A|B|C)"
@@ -303,7 +315,7 @@ impl FakeOperator {
                             return Ok(Value::String(options[idx].to_string()));
                         }
                     }
-                    // For other patterns, just return a placeholder
+                    // For complex patterns, return a placeholder (see LIMITATION above)
                     Ok(Value::String("REGEX_PATTERN".to_string()))
                 } else {
                     Err(DataFakeError::FakeOperatorError(
@@ -317,170 +329,72 @@ impl FakeOperator {
             ))),
         }
     }
+}
 
-    fn generate_u8(args: &[Value]) -> Result<Value> {
-        match args.len() {
-            1 => Ok(Value::Number(serde_json::Number::from(Faker.fake::<u8>()))),
-            3 => {
-                let min = args[1].as_u64().unwrap_or(0) as u8;
-                let max = args[2].as_u64().unwrap_or(255) as u8;
-                Ok(Value::Number(serde_json::Number::from(
-                    rand::rng().random_range(min..=max),
-                )))
+/// Macro to generate numeric type handlers, reducing code duplication.
+/// Generates functions for integer types (u8, u16, u32, u64, i8, i16, i32, i64).
+macro_rules! impl_integer_generator {
+    ($fn_name:ident, $type:ty, $extract_fn:ident, $default_min:expr, $default_max:expr) => {
+        fn $fn_name(args: &[Value]) -> Result<Value> {
+            match args.len() {
+                1 => Ok(Value::Number(serde_json::Number::from(
+                    Faker.fake::<$type>(),
+                ))),
+                3 => {
+                    let min = args[1].$extract_fn().unwrap_or($default_min as _) as $type;
+                    let max = args[2].$extract_fn().unwrap_or($default_max as _) as $type;
+                    Ok(Value::Number(serde_json::Number::from(
+                        rand::rng().random_range(min..=max),
+                    )))
+                }
+                _ => Err(DataFakeError::FakeOperatorError(
+                    concat!(stringify!($type), " requires either 1 or 3 arguments").to_string(),
+                )),
             }
-            _ => Err(DataFakeError::FakeOperatorError(
-                "u8 requires either 1 or 3 arguments".to_string(),
-            )),
         }
-    }
+    };
+}
 
-    fn generate_u16(args: &[Value]) -> Result<Value> {
-        match args.len() {
-            1 => Ok(Value::Number(serde_json::Number::from(Faker.fake::<u16>()))),
-            3 => {
-                let min = args[1].as_u64().unwrap_or(0) as u16;
-                let max = args[2].as_u64().unwrap_or(65535) as u16;
-                Ok(Value::Number(serde_json::Number::from(
-                    rand::rng().random_range(min..=max),
-                )))
+/// Macro to generate floating-point type handlers.
+macro_rules! impl_float_generator {
+    ($fn_name:ident, $type:ty) => {
+        fn $fn_name(args: &[Value]) -> Result<Value> {
+            match args.len() {
+                1 => Ok(Value::Number(
+                    serde_json::Number::from_f64(Faker.fake::<$type>() as f64)
+                        .expect("Generated float should be a valid JSON number"),
+                )),
+                3 => {
+                    let min = args[1].as_f64().unwrap_or(0.0) as $type;
+                    let max = args[2].as_f64().unwrap_or(1.0) as $type;
+                    let value = rand::rng().random_range(min..=max);
+                    Ok(Value::Number(
+                        serde_json::Number::from_f64(value as f64)
+                            .expect("Generated float should be a valid JSON number"),
+                    ))
+                }
+                _ => Err(DataFakeError::FakeOperatorError(
+                    concat!(stringify!($type), " requires either 1 or 3 arguments").to_string(),
+                )),
             }
-            _ => Err(DataFakeError::FakeOperatorError(
-                "u16 requires either 1 or 3 arguments".to_string(),
-            )),
         }
-    }
+    };
+}
 
-    fn generate_u32(args: &[Value]) -> Result<Value> {
-        match args.len() {
-            1 => Ok(Value::Number(serde_json::Number::from(Faker.fake::<u32>()))),
-            3 => {
-                let min = args[1].as_u64().unwrap_or(0) as u32;
-                let max = args[2].as_u64().unwrap_or(u32::MAX as u64) as u32;
-                Ok(Value::Number(serde_json::Number::from(
-                    rand::rng().random_range(min..=max),
-                )))
-            }
-            _ => Err(DataFakeError::FakeOperatorError(
-                "u32 requires either 1 or 3 arguments".to_string(),
-            )),
-        }
-    }
+impl FakeOperator {
+    // Generate integer type handlers using the macro
+    impl_integer_generator!(generate_u8, u8, as_u64, 0, u8::MAX);
+    impl_integer_generator!(generate_u16, u16, as_u64, 0, u16::MAX);
+    impl_integer_generator!(generate_u32, u32, as_u64, 0, u32::MAX);
+    impl_integer_generator!(generate_u64, u64, as_u64, 0, u64::MAX);
+    impl_integer_generator!(generate_i8, i8, as_i64, i8::MIN, i8::MAX);
+    impl_integer_generator!(generate_i16, i16, as_i64, i16::MIN, i16::MAX);
+    impl_integer_generator!(generate_i32, i32, as_i64, i32::MIN, i32::MAX);
+    impl_integer_generator!(generate_i64, i64, as_i64, i64::MIN, i64::MAX);
 
-    fn generate_u64(args: &[Value]) -> Result<Value> {
-        match args.len() {
-            1 => Ok(Value::Number(serde_json::Number::from(Faker.fake::<u64>()))),
-            3 => {
-                let min = args[1].as_u64().unwrap_or(0);
-                let max = args[2].as_u64().unwrap_or(u64::MAX);
-                Ok(Value::Number(serde_json::Number::from(
-                    rand::rng().random_range(min..=max),
-                )))
-            }
-            _ => Err(DataFakeError::FakeOperatorError(
-                "u64 requires either 1 or 3 arguments".to_string(),
-            )),
-        }
-    }
-
-    fn generate_i8(args: &[Value]) -> Result<Value> {
-        match args.len() {
-            1 => Ok(Value::Number(serde_json::Number::from(Faker.fake::<i8>()))),
-            3 => {
-                let min = args[1].as_i64().unwrap_or(i8::MIN as i64) as i8;
-                let max = args[2].as_i64().unwrap_or(i8::MAX as i64) as i8;
-                Ok(Value::Number(serde_json::Number::from(
-                    rand::rng().random_range(min..=max),
-                )))
-            }
-            _ => Err(DataFakeError::FakeOperatorError(
-                "i8 requires either 1 or 3 arguments".to_string(),
-            )),
-        }
-    }
-
-    fn generate_i16(args: &[Value]) -> Result<Value> {
-        match args.len() {
-            1 => Ok(Value::Number(serde_json::Number::from(Faker.fake::<i16>()))),
-            3 => {
-                let min = args[1].as_i64().unwrap_or(i16::MIN as i64) as i16;
-                let max = args[2].as_i64().unwrap_or(i16::MAX as i64) as i16;
-                Ok(Value::Number(serde_json::Number::from(
-                    rand::rng().random_range(min..=max),
-                )))
-            }
-            _ => Err(DataFakeError::FakeOperatorError(
-                "i16 requires either 1 or 3 arguments".to_string(),
-            )),
-        }
-    }
-
-    fn generate_i32(args: &[Value]) -> Result<Value> {
-        match args.len() {
-            1 => Ok(Value::Number(serde_json::Number::from(Faker.fake::<i32>()))),
-            3 => {
-                let min = args[1].as_i64().unwrap_or(i32::MIN as i64) as i32;
-                let max = args[2].as_i64().unwrap_or(i32::MAX as i64) as i32;
-                Ok(Value::Number(serde_json::Number::from(
-                    rand::rng().random_range(min..=max),
-                )))
-            }
-            _ => Err(DataFakeError::FakeOperatorError(
-                "i32 requires either 1 or 3 arguments".to_string(),
-            )),
-        }
-    }
-
-    fn generate_i64(args: &[Value]) -> Result<Value> {
-        match args.len() {
-            1 => Ok(Value::Number(serde_json::Number::from(Faker.fake::<i64>()))),
-            3 => {
-                let min = args[1].as_i64().unwrap_or(i64::MIN);
-                let max = args[2].as_i64().unwrap_or(i64::MAX);
-                Ok(Value::Number(serde_json::Number::from(
-                    rand::rng().random_range(min..=max),
-                )))
-            }
-            _ => Err(DataFakeError::FakeOperatorError(
-                "i64 requires either 1 or 3 arguments".to_string(),
-            )),
-        }
-    }
-
-    fn generate_f32(args: &[Value]) -> Result<Value> {
-        match args.len() {
-            1 => Ok(Value::Number(
-                serde_json::Number::from_f64(Faker.fake::<f32>() as f64).unwrap(),
-            )),
-            3 => {
-                let min = args[1].as_f64().unwrap_or(0.0) as f32;
-                let max = args[2].as_f64().unwrap_or(1.0) as f32;
-                let value = rand::rng().random_range(min..=max);
-                Ok(Value::Number(
-                    serde_json::Number::from_f64(value as f64).unwrap(),
-                ))
-            }
-            _ => Err(DataFakeError::FakeOperatorError(
-                "f32 requires either 1 or 3 arguments".to_string(),
-            )),
-        }
-    }
-
-    fn generate_f64(args: &[Value]) -> Result<Value> {
-        match args.len() {
-            1 => Ok(Value::Number(
-                serde_json::Number::from_f64(Faker.fake::<f64>()).unwrap(),
-            )),
-            3 => {
-                let min = args[1].as_f64().unwrap_or(0.0);
-                let max = args[2].as_f64().unwrap_or(1.0);
-                let value = rand::rng().random_range(min..=max);
-                Ok(Value::Number(serde_json::Number::from_f64(value).unwrap()))
-            }
-            _ => Err(DataFakeError::FakeOperatorError(
-                "f64 requires either 1 or 3 arguments".to_string(),
-            )),
-        }
-    }
+    // Generate floating-point type handlers using the macro
+    impl_float_generator!(generate_f32, f32);
+    impl_float_generator!(generate_f64, f64);
 
     fn generate_bic_fixed(length: u64) -> Result<Value> {
         use rand::seq::IndexedRandom;

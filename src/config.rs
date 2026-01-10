@@ -1,11 +1,25 @@
+//! Configuration parsing and validation for datafake-rs.
+//!
+//! This module provides [`ConfigParser`] for parsing and validating
+//! JSON configuration into [`DataFakeConfig`] structures.
+
 use crate::error::{DataFakeError, Result};
 use crate::types::{DataFakeConfig, GenerationContext};
 use serde_json::Value;
 use std::collections::HashMap;
 
+/// Parser and validator for datafake configuration.
+///
+/// `ConfigParser` provides static methods for parsing JSON strings or values
+/// into validated [`DataFakeConfig`] structures.
 pub struct ConfigParser;
 
 impl ConfigParser {
+    /// Parses a JSON string into a validated configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the JSON is invalid or fails validation.
     pub fn parse(json_str: &str) -> Result<DataFakeConfig> {
         let config: DataFakeConfig = serde_json::from_str(json_str)
             .map_err(|e| DataFakeError::ConfigParse(format!("Failed to parse JSON: {e}")))?;
@@ -14,6 +28,11 @@ impl ConfigParser {
         Ok(config)
     }
 
+    /// Parses a `serde_json::Value` into a validated configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the value cannot be converted or fails validation.
     pub fn parse_value(json_value: Value) -> Result<DataFakeConfig> {
         let config: DataFakeConfig = serde_json::from_value(json_value)
             .map_err(|e| DataFakeError::ConfigParse(format!("Failed to parse JSON value: {e}")))?;
@@ -56,41 +75,46 @@ impl ConfigParser {
 
     fn validate_schema(schema: &Value) -> Result<()> {
         match schema {
-            Value::Object(map) => {
-                // Check if this is a JSONLogic expression
-                if map.contains_key("fake") || map.contains_key("var") {
-                    Self::validate_jsonlogic_expression(schema)?;
-                } else {
-                    // Regular object, validate each property
-                    for (key, value) in map {
-                        if key.is_empty() {
-                            return Err(DataFakeError::InvalidConfig(
-                                "Schema key cannot be empty".to_string(),
-                            ));
-                        }
-                        Self::validate_schema(value)?;
-                    }
-                }
-            }
-            Value::Array(arr) => {
-                for item in arr {
-                    Self::validate_schema(item)?;
-                }
-            }
-            Value::Null => {
+            Value::Object(map) => Self::validate_schema_object(map, schema),
+            Value::Array(arr) => Self::validate_schema_array(arr),
+            Value::Null => Err(DataFakeError::InvalidConfig(
+                "Schema values cannot be null".to_string(),
+            )),
+            _ => Ok(()),
+        }
+    }
+
+    /// Validates an object within the schema.
+    fn validate_schema_object(map: &serde_json::Map<String, Value>, schema: &Value) -> Result<()> {
+        // Check if this is a JSONLogic expression
+        if map.contains_key("fake") || map.contains_key("var") {
+            return Self::validate_jsonlogic_expression(schema);
+        }
+
+        // Regular object: validate each property
+        for (key, value) in map {
+            if key.is_empty() {
                 return Err(DataFakeError::InvalidConfig(
-                    "Schema values cannot be null".to_string(),
+                    "Schema key cannot be empty".to_string(),
                 ));
             }
-            _ => {}
+            Self::validate_schema(value)?;
+        }
+        Ok(())
+    }
+
+    /// Validates an array within the schema.
+    fn validate_schema_array(arr: &[Value]) -> Result<()> {
+        for item in arr {
+            Self::validate_schema(item)?;
         }
         Ok(())
     }
 
     fn validate_jsonlogic_expression(value: &Value) -> Result<()> {
         if let Value::Object(map) = value {
-            if map.contains_key("fake") {
-                Self::validate_fake_operator(map.get("fake").unwrap())?;
+            if let Some(fake_args) = map.get("fake") {
+                Self::validate_fake_operator(fake_args)?;
             } else if map.contains_key("var")
                 && let Some(Value::String(var_name)) = map.get("var")
                 && var_name.is_empty()
@@ -162,6 +186,7 @@ impl ConfigParser {
         }
     }
 
+    /// Creates a generation context from the configuration's variables.
     pub fn create_context(config: &DataFakeConfig) -> GenerationContext {
         GenerationContext::with_variables(config.variables.clone())
     }

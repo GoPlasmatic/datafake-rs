@@ -1,3 +1,8 @@
+//! JSONLogic evaluation engine for processing schemas.
+//!
+//! This module provides the core engine that evaluates JSONLogic expressions
+//! with the custom `fake` operator for generating fake data.
+
 use crate::error::{DataFakeError, Result};
 use crate::operators::FakeOperator;
 use crate::types::GenerationContext;
@@ -5,6 +10,8 @@ use datalogic_rs::DataLogic;
 use serde_json::{Map, Value};
 use std::cell::RefCell;
 
+// Thread-local storage for DataLogic instances.
+// Each thread gets its own DataLogic instance to avoid contention.
 thread_local! {
     static THREAD_LOCAL_DATA_LOGIC: RefCell<Option<DataLogic>> = const { RefCell::new(None) };
 }
@@ -22,19 +29,35 @@ fn get_or_init_datalogic() -> &'static RefCell<Option<DataLogic>> {
 
             *dl_opt = Some(dl);
         }
-        // This is safe because we're returning a reference to a thread_local
+        // SAFETY: This is safe because:
+        // 1. We're returning a reference to a thread_local static, which has 'static lifetime
+        // 2. The reference is only used within the same thread (thread_local guarantees this)
+        // 3. The RefCell provides interior mutability with runtime borrow checking
+        // 4. The pointer cast is valid since we're just extending the lifetime of the borrow
+        //    to match the thread_local's actual 'static lifetime
         unsafe { &*(dl_cell as *const RefCell<Option<DataLogic>>) }
     })
 }
 
+/// The core evaluation engine for JSONLogic expressions with fake data support.
+///
+/// `Engine` provides static methods for evaluating JSONLogic expressions,
+/// processing schemas, and generating variables. It uses thread-local
+/// `DataLogic` instances for safe concurrent usage.
 pub struct Engine;
 
 impl Engine {
+    /// Evaluates a single JSONLogic expression with the given context.
+    ///
+    /// This method compiles and evaluates the expression using datalogic-rs,
+    /// with the custom `fake` operator available for generating fake data.
     pub fn evaluate(expression: &Value, context: &GenerationContext) -> Result<Value> {
         // Evaluate the expression directly with JSONLogic (fake operator is registered)
         let dl_cell = get_or_init_datalogic();
         let dl_opt = dl_cell.borrow();
-        let data_logic = dl_opt.as_ref().unwrap();
+        let data_logic = dl_opt
+            .as_ref()
+            .expect("DataLogic should be initialized by get_or_init_datalogic");
 
         // Convert context to JSON value for datalogic
         let context_json =
@@ -52,6 +75,10 @@ impl Engine {
             })
     }
 
+    /// Processes a schema, evaluating all JSONLogic expressions within it.
+    ///
+    /// This method recursively walks the schema structure, evaluating
+    /// JSONLogic operators and preserving the overall structure of objects and arrays.
     pub fn process_schema(schema: &Value, context: &GenerationContext) -> Result<Value> {
         // Since we can't use preserve_structure with custom operators in v4,
         // we need to manually handle object structure preservation
@@ -107,6 +134,10 @@ impl Engine {
         )
     }
 
+    /// Generates values for all defined variables.
+    ///
+    /// Each variable expression is evaluated and the results are returned
+    /// as a map that can be used as context for schema processing.
     pub fn generate_variables(variables: &Map<String, Value>) -> Result<Map<String, Value>> {
         if variables.is_empty() {
             return Ok(Map::new());
