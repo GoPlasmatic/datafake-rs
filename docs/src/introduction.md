@@ -1,6 +1,26 @@
-# Introduction
+<div align="center">
+<img src="https://avatars.githubusercontent.com/u/207296579?s=200&v=4" alt="Plasmatic Logo" width="120" height="120">
 
-**datafake-rs** is a high-performance Rust library for generating realistic fake JSON data using JSONLogic-based configuration. It's designed for testing, prototyping, and development scenarios where you need realistic mock data.
+# datafake-rs
+
+**A high-performance mock JSON data generation library for Rust.**
+
+*Uses JSONLogic for flexible and powerful fake data generation.*
+
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org)
+[![Crates.io](https://img.shields.io/crates/v/datafake-rs.svg)](https://crates.io/crates/datafake-rs)
+
+<p>
+<a href="https://github.com/GoPlasmatic">Organization</a> •
+<a href="https://docs.rs/datafake-rs">Docs</a> •
+<a href="https://github.com/GoPlasmatic/datafake-rs/issues">Report a Bug</a>
+</p>
+</div>
+
+---
+
+**datafake-rs** is designed for testing, prototyping, and development scenarios where you need realistic mock data.
 
 ## Features
 

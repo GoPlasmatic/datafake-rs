@@ -10,8 +10,6 @@
 [](https://opensource.org/licenses/Apache-2.0)
 [](https://www.rust-lang.org)
 [](https://crates.io/crates/datafake-rs)
-[](https://github.com/GoPlasmatic/datafake-rs/actions/workflows/ci.yml)
-[](https://codecov.io/gh/GoPlasmatic/datafake-rs)
 
 <p>
 <a href="https://github.com/GoPlasmatic">🏢 Organization</a> •
