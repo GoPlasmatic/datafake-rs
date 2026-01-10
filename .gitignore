@@ -25,3 +25,7 @@ target
 
 /target
 .claude/
+
+# mdbook build output
+docs/book/
+docs/src/wasm/
